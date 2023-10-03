@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace MichielRoos\WizardCrpagetree;
 
+use TYPO3\CMS\Backend\ElementBrowser\DatabaseBrowser;
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Driver\Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -24,7 +25,6 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
-use TYPO3\CMS\Recordlist\Browser\DatabaseBrowser;
 
 /**
  * "New page tree" controller
@@ -267,9 +267,7 @@ class NewPagetreeController
                     $GLOBALS['TCA']['pages']['ctrl']['languageField'],
                     $queryBuilder->createNamedParameter(0, Connection::PARAM_INT)
                 )
-            )
-            ->orderBy('sorting')
-            ->execute()
+            )->orderBy('sorting')->executeQuery()
             ->fetchAllAssociative();
     }
 

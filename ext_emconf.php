@@ -6,7 +6,6 @@ $EM_CONF[$_EXTKEY] = [
     'category' => 'module',
     'version' => '6.0.0',
     'state' => 'stable',
-    'uploadfolder' => 0,
     'author' => 'Michiel Roos',
     'author_email' => 'michiel@michielroos.com',
     'author_company' => 'Michiel Roos',
