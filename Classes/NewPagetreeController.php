@@ -99,15 +99,16 @@ class NewPagetreeController
         $view->assign('pageUid', $pageUid);
 
         if ($canCreateNew) {
-            $newPagesData = $request->getParsedBody()['pageTree'];
+            $parsedBody = $request->getParsedBody();
+            $newPagesData = $parsedBody['pageTree'] ?? '';
             if (!empty($newPagesData)) {
                 $newPagesData = explode("\r\n", $newPagesData);
                 $newPagesData = $this->filterComments($newPagesData);
 
                 $hasNewPagesData = true;
-                $afterExisting = isset($request->getParsedBody()['createInListEnd']);
-                $hidePages = isset($request->getParsedBody()['hidePages']);
-                $hidePagesInMenu = isset($request->getParsedBody()['hidePagesInMenus']);
+                $afterExisting = isset($parsedBody['createInListEnd']);
+                $hidePages = isset($parsedBody['hidePages']);
+                $hidePagesInMenu = isset($parsedBody['hidePagesInMenus']);
                 $pagesCreated = $this->createPagetree($newPagesData, $pageUid, $afterExisting, $hidePages, $hidePagesInMenu);
                 $view->assign('pagesCreated', $pagesCreated);
                 $subPages = $this->getSubPagesOfPage($pageUid);
@@ -283,10 +284,10 @@ class NewPagetreeController
     {
         $newData = [];
         foreach ($data as $value) {
-            if ($value['value']) {
+            if ($value['value'] ?? false) {
                 $newData[] = $value['value'];
             }
-            if ($value['data']) {
+            if ($value['data'] ?? false) {
                 $newData = array_merge($newData, $this->compressArray($value['data']));
             }
         }
