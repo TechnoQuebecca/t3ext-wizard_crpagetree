@@ -1,9 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace MichielRoos\WizardCrpagetree\Hook;
+namespace MichielRoos\WizardCrpagetree\Event;
 
 use TYPO3\CMS\Backend\Controller\BackendController;
+use TYPO3\CMS\Backend\Controller\Event\AfterBackendPageRenderEvent;
 use TYPO3\CMS\Backend\Routing\Exception\RouteNotFoundException;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Core\Page\PageRenderer;
@@ -12,17 +13,13 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 /**
  * This class adds WizardCrpagetree related JavaScript to the backend
  */
-class BackendControllerHook
+class BackendControllerEvent
 {
     /**
      * Adds WizardCrpagetree-specific JavaScript
-     *
-     * @param array $configuration
-     * @param BackendController $backendController
      * @throws RouteNotFoundException
-     * @noinspection PhpUnusedParameterInspection
      */
-    public function addJavaScript(array $configuration, BackendController $backendController)
+    public function __invoke(AfterBackendPageRenderEvent $event): void
     {
         /** @var UriBuilder $uriBuilder */
         $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
