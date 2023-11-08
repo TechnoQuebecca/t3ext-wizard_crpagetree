@@ -1,6 +1,11 @@
-MichielRoos\WizardCrpagetree\Event\BackendControllerEvent:
-  public: true
-  tags:
-    - name: event.listener
-      identifier: 'add-js-event'
-      event: \TYPO3\CMS\Backend\Controller\Event\AfterBackendPageRenderEvent
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+  MichielRoos\WizardCrpagetree\EventListener\BackendControllerEvent:
+    public: true
+    tags:
+      - name: event.listener
+        identifier: 'add-js-event'
+        event: \TYPO3\CMS\Backend\Controller\Event\AfterBackendPageRenderEvent
