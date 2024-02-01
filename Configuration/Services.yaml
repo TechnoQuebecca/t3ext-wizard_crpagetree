@@ -3,6 +3,11 @@ services:
     autowire: true
     autoconfigure: true
     public: false
+
+  MichielRoos\WizardCrpagetree\:
+    resource: '../Classes/*'
+    exclude: '../Classes/Domain/Model/*'
+
   MichielRoos\WizardCrpagetree\EventListener\BackendControllerEvent:
     public: true
     tags:
