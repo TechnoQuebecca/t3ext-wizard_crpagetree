@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace MichielRoos\WizardCrpagetree\EventListener;
 
-use TYPO3\CMS\Backend\Controller\BackendController;
 use TYPO3\CMS\Backend\Controller\Event\AfterBackendPageRenderEvent;
 use TYPO3\CMS\Backend\Routing\Exception\RouteNotFoundException;
 use TYPO3\CMS\Backend\Routing\UriBuilder;

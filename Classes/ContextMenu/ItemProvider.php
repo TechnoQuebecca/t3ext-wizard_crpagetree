@@ -81,7 +81,7 @@ class ItemProvider extends PageProvider
             $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
             $attributes += [
                 'data-page-new-tree-url' => (string)$uriBuilder->buildUriFromRoute('pagetree_new', ['id' => $this->record['uid']]),
-                'data-callback-module'   => 'TYPO3/CMS/WizardCrpagetree/ContextMenuActions',
+                'data-callback-module'   => '@michiel-roos/wizardcrpagetree/ContextMenuActions',
             ];
         }
         return $attributes;

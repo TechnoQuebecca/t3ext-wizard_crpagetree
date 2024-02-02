@@ -2,14 +2,14 @@
 declare(strict_types=1);
 namespace MichielRoos\WizardCrpagetree;
 
-use TYPO3\CMS\Backend\ElementBrowser\DatabaseBrowser;
 use Doctrine\DBAL\DBALException;
 use Doctrine\DBAL\Driver\Exception;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Routing\PreviewUriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplate;
-use TYPO3\CMS\Backend\Tree\View\ElementBrowserPageTreeView;
+use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
+use TYPO3\CMS\Backend\Tree\View\PageTreeView;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\Connection;
@@ -17,7 +17,6 @@ use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Domain\Repository\PageRepository;
-use TYPO3\CMS\Core\Http\HtmlResponse;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Localization\LanguageService;
@@ -36,11 +35,24 @@ class NewPagetreeController
 {
     protected ServerRequestInterface $request;
 
+    /**
+     * @var ModuleTemplate
+     */
     protected ModuleTemplate $moduleTemplate;
 
-    public function __construct(ModuleTemplate $moduleTemplate = null)
+    /**
+     * @var ModuleTemplateFactory
+     */
+    protected ModuleTemplateFactory $moduleTemplateFactory;
+
+    /**
+     * @param ModuleTemplateFactory $moduleTemplateFactory
+     *
+     * @return void
+     */
+    public function injectModuleTemplateFactory(ModuleTemplateFactory $moduleTemplateFactory)
     {
-        $this->moduleTemplate = $moduleTemplate ?? GeneralUtility::makeInstance(ModuleTemplate::class);
+        $this->moduleTemplateFactory = $moduleTemplateFactory;
     }
 
     /**
@@ -54,6 +66,7 @@ class NewPagetreeController
     public function mainAction(ServerRequestInterface $request): ResponseInterface
     {
         $this->request = $request;
+        $this->moduleTemplate = $this->moduleTemplateFactory->create($this->request);
 
         $backendUser = $this->getBackendUser();
         $pageUid = (int)$request->getQueryParams()['id'];
@@ -62,8 +75,7 @@ class NewPagetreeController
         $pageRecord = BackendUtility::readPageAccess($pageUid, $backendUser->getPagePermsClause(Permission::PAGE_SHOW));
         if (!is_array($pageRecord)) {
             // User has no permission on parent page, should not happen, just render an empty page
-            $this->moduleTemplate->setContent('');
-            return new HtmlResponse($this->moduleTemplate->renderContent());
+            $this->moduleTemplate->renderResponse('Page/NewPagetree');
         }
 
         // Doc header handling
@@ -94,9 +106,9 @@ class NewPagetreeController
         $calculatedPermissions = $backendUser->calcPerms($pageRecord);
         $canCreateNew = $backendUser->isAdmin() || $calculatedPermissions & Permission::PAGE_NEW;
 
-        $view->assign('canCreateNew', $canCreateNew);
-        $view->assign('maxTitleLength', $backendUser->uc['titleLen'] ?? 20);
-        $view->assign('pageUid', $pageUid);
+        $this->moduleTemplate->assign('canCreateNew', $canCreateNew);
+        $this->moduleTemplate->assign('maxTitleLength', $backendUser->uc['titleLen'] ?? 20);
+        $this->moduleTemplate->assign('pageUid', $pageUid);
 
         if ($canCreateNew) {
             $parsedBody = $request->getParsedBody();
@@ -110,7 +122,7 @@ class NewPagetreeController
                 $hidePages = isset($parsedBody['hidePages']);
                 $hidePagesInMenu = isset($parsedBody['hidePagesInMenus']);
                 $pagesCreated = $this->createPagetree($newPagesData, $pageUid, $afterExisting, $hidePages, $hidePagesInMenu);
-                $view->assign('pagesCreated', $pagesCreated);
+                $this->moduleTemplate->assign('pagesCreated', $pagesCreated);
                 $subPages = $this->getSubPagesOfPage($pageUid);
                 $visiblePages = [];
                 foreach ($subPages as $page) {
@@ -119,26 +131,24 @@ class NewPagetreeController
                         $visiblePages[] = $page;
                     }
                 }
-                $view->assign('visiblePages', $visiblePages);
+                $this->moduleTemplate->assign('visiblePages', $visiblePages);
             } else {
                 $hasNewPagesData = false;
             }
 
             // Display result:
-            $tree = GeneralUtility::makeInstance(ElementBrowserPageTreeView::class);
+            $tree = GeneralUtility::makeInstance(PageTreeView::class);
             $tree->init(' AND pages.doktype < ' . PageRepository::DOKTYPE_RECYCLER . ' AND pages.hidden = "0"');
-            $tree->setLinkParameterProvider(GeneralUtility::makeInstance(DatabaseBrowser::class));
-            $tree->thisScript = '#';
-
             $tree->getTree($pageUid);
 
-            $view->assign('createdPages', $tree->printTree());
-
-            $view->assign('hasNewPagesData', $hasNewPagesData);
+            $assignedValues= [
+                'createdPages' => $tree->tree,
+                'hasNewPagesData' => $hasNewPagesData
+            ];
+            $this->moduleTemplate->assignMultiple($assignedValues);
         }
 
-        $this->moduleTemplate->setContent($view->render());
-        return new HtmlResponse($this->moduleTemplate->renderContent());
+        return $this->moduleTemplate->renderResponse('Page/NewPagetree');
     }
 
     /**
