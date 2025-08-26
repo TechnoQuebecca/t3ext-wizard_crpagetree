@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace MichielRoos\WizardCrpagetree;
 
 use Doctrine\DBAL\DBALException;
@@ -28,7 +30,6 @@ use TYPO3\CMS\Fluid\View\StandaloneView;
  * "New page tree" controller
  *
  * Fluid template based backend module for TYPO3 9.5
- *
  */
 class NewPagetreeController
 {
@@ -263,7 +264,6 @@ class NewPagetreeController
             ->executeQuery()
             ->fetchAllAssociative();
     }
-
 
     /**
      * Return the data as a compressed array

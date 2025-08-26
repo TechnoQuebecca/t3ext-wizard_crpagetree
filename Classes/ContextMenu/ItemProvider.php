@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace MichielRoos\WizardCrpagetree\ContextMenu;
 
 use TYPO3\CMS\Backend\ContextMenu\ItemProviders\PageProvider;
@@ -9,7 +11,6 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Class ItemProvider
- * @package MichielRoos\WizardCrpagetree\ContextMenu
  */
 class ItemProvider extends PageProvider
 {
@@ -18,8 +19,8 @@ class ItemProvider extends PageProvider
             'type'           => 'item',
             'label'          => 'LLL:EXT:wizard_crpagetree/Resources/Private/Language/locallang.xlf:title',
             'iconIdentifier' => 'apps-pagetree-drag-move-between',
-            'callbackAction' => 'pagesNewTree'
-        ]
+            'callbackAction' => 'pagesNewTree',
+        ],
     ];
 
     /**
@@ -61,7 +62,6 @@ class ItemProvider extends PageProvider
      * BEWARE: Returned priority should logically not clash with another provider.
      *         Please check @return int
      * @see \TYPO3\CMS\Backend\ContextMenu\ContextMenu::getAvailableProviders() if needed.
-     *
      */
     public function getPriority(): int
     {
