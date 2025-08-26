@@ -20,7 +20,7 @@ return (new \PhpCsFixer\Config())
     ->setRiskyAllowed(true)
     ->setRules([
         '@DoctrineAnnotation' => true,
-        '@PER-CS2.0' => true,
+        '@PER-CS3.0' => true,
         '@PHP82Migration' => true,
         'cast_spaces' => ['space' => 'none'],
         'declare_parentheses' => true,
