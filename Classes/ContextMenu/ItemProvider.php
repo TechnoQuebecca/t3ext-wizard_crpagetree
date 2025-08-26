@@ -9,9 +9,6 @@ use TYPO3\CMS\Backend\Routing\Exception\RouteNotFoundException;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
-/**
- * Class ItemProvider
- */
 class ItemProvider extends PageProvider
 {
     /**
