@@ -6,6 +6,12 @@
 Change log
 ==========
 
+Version 7.0.0
+-------------
+
+* **Only** TYPO3 v13 is supported
+
+
 Version 6.0.1
 -------------
 
