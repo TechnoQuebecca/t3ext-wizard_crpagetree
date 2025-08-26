@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace MichielRoos\WizardCrpagetree;
 
-use Doctrine\DBAL\DBALException;
-use Doctrine\DBAL\Driver\Exception;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Routing\PreviewUriBuilder;
@@ -17,42 +15,27 @@ use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
-use TYPO3\CMS\Core\Http\HtmlResponse;
-use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Core\Imaging\IconSize;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
-use TYPO3\CMS\Fluid\View\StandaloneView;
 
-/**
- * "New page tree" controller
- *
- * Fluid template based backend module for TYPO3 9.5
- */
 class NewPagetreeController
 {
     protected ServerRequestInterface $request;
 
     protected ModuleTemplate $moduleTemplate;
 
-    protected IconFactory $iconFactory;
-    protected ModuleTemplateFactory $moduleTemplateFactory;
-
-    public function __construct(IconFactory $iconFactory, ModuleTemplateFactory $moduleTemplateFactory)
-    {
-        $this->iconFactory = $iconFactory;
-        $this->moduleTemplateFactory = $moduleTemplateFactory;
-    }
+    public function __construct(
+        protected IconFactory $iconFactory,
+        protected ModuleTemplateFactory $moduleTemplateFactory,
+        private readonly ConnectionPool $connectionPool
+    ) {}
 
     /**
      * Main function Handling input variables and rendering main view
-     *
-     * @param ServerRequestInterface $request
-     * @return ResponseInterface Response
-     * @throws DBALException
-     * @throws Exception
      */
     public function mainAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -66,8 +49,7 @@ class NewPagetreeController
         $pageRecord = BackendUtility::readPageAccess($pageUid, $backendUser->getPagePermsClause(Permission::PAGE_SHOW));
         if (!is_array($pageRecord)) {
             // User has no permission on parent page, should not happen, just render an empty page
-            $this->moduleTemplate->setContent('');
-            return new HtmlResponse($this->moduleTemplate->renderContent());
+            return $this->moduleTemplate->renderResponse('');
         }
 
         // Doc header handling
@@ -82,15 +64,12 @@ class NewPagetreeController
         $viewButton = $buttonBar->makeLinkButton()
             ->setDataAttributes($previewDataAttributes ?? [])
             ->setTitle($this->getLanguageService()->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.showPage'))
-            ->setIcon($this->iconFactory->getIcon('actions-view-page', Icon::SIZE_SMALL))
+            ->setIcon($this->iconFactory->getIcon('actions-view-page', IconSize::SMALL))
             ->setHref('#');
         $buttonBar->addButton($cshButton)->addButton($viewButton);
 
         // Main view setup
-        $view = GeneralUtility::makeInstance(StandaloneView::class);
-        $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName(
-            'EXT:wizard_crpagetree/Resources/Private/Templates/Page/NewPagetree.html'
-        ));
+        $view = $this->moduleTemplate;
 
         $calculatedPermissions = new Permission($backendUser->calcPerms($pageRecord));
         $canCreateNew = $backendUser->isAdmin() || $calculatedPermissions->createPagePermissionIsGranted();
@@ -128,8 +107,7 @@ class NewPagetreeController
             $view->assign('hasNewPagesData', $hasNewPagesData);
         }
 
-        $this->moduleTemplate->setContent($view->render());
-        return new HtmlResponse($this->moduleTemplate->renderContent());
+        return $this->moduleTemplate->renderResponse('EXT:wizard_crpagetree/Resources/Private/Templates/Page/NewPagetree.html');
     }
 
     /**
@@ -149,11 +127,7 @@ class NewPagetreeController
         // Set first pid to "-1 * uid of last existing sub-page" if pages should be created at end
         $firstPid = $pageUid;
         if ($afterExisting) {
-            try {
-                $subPages = $this->getSubPagesOfPage($pageUid);
-            } catch (DBALException|Exception) {
-                return false;
-            }
+            $subPages = $this->getSubPagesOfPage($pageUid);
             $lastPage = end($subPages);
             if (isset($lastPage['uid']) && MathUtility::canBeInterpretedAsInteger($lastPage['uid'])) {
                 $firstPid = -(int)$lastPage['uid'];
@@ -240,13 +214,10 @@ class NewPagetreeController
      * Fetch all data fields for full page icon display
      *
      * @param int $pageUid Get sub-pages from this pages
-     * @return array
-     * @throws Exception
-     * @throws DBALException
      */
     protected function getSubPagesOfPage(int $pageUid): array
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('pages');
         $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
         return $queryBuilder->select('*')
             ->from('pages')
@@ -456,21 +427,11 @@ class NewPagetreeController
         return [];
     }
 
-    /**
-     * Returns LanguageService
-     *
-     * @return LanguageService
-     */
     protected function getLanguageService(): LanguageService
     {
         return $GLOBALS['LANG'];
     }
 
-    /**
-     * Returns current BE user
-     *
-     * @return BackendUserAuthentication
-     */
     protected function getBackendUser(): BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'];
