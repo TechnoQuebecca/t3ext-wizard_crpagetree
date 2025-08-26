@@ -6,6 +6,7 @@ namespace MichielRoos\WizardCrpagetree;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Backend\Attribute\AsController;
 use TYPO3\CMS\Backend\Routing\PreviewUriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplate;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
@@ -28,6 +29,7 @@ use TYPO3\CMS\Core\Utility\MathUtility;
  * @phpstan-type PageTreeData array{data?: mixed, value?: string}
  * @phpstan-type PageTreeStructure array<int,PageTreeData>
  */
+#[AsController]
 class NewPagetreeController
 {
     protected ServerRequestInterface $request;
@@ -55,7 +57,7 @@ class NewPagetreeController
         $pageRecord = BackendUtility::readPageAccess($pageUid, $backendUser->getPagePermsClause(Permission::PAGE_SHOW));
         if (!is_array($pageRecord)) {
             // User has no permission on parent page, should not happen, just render an empty page
-            return $this->moduleTemplate->renderResponse('');
+            return $this->moduleTemplate->renderResponse();
         }
 
         // Doc header handling
@@ -111,7 +113,7 @@ class NewPagetreeController
             $view->assign('hasNewPagesData', $hasNewPagesData);
         }
 
-        return $this->moduleTemplate->renderResponse('EXT:wizard_crpagetree/Resources/Private/Templates/Page/NewPagetree.html');
+        return $this->moduleTemplate->renderResponse('Page/NewPagetree');
     }
 
     /**

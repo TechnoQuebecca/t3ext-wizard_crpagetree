@@ -16,7 +16,6 @@ class ItemProvider extends PageProvider
      */
     protected $itemsConfiguration = [
         'pagesNewTree' => [
-            'type'           => 'item',
             'label'          => 'LLL:EXT:wizard_crpagetree/Resources/Private/Language/locallang.xlf:title',
             'iconIdentifier' => 'apps-pagetree-drag-move-between',
             'callbackAction' => 'pagesNewTree',
@@ -81,7 +80,7 @@ class ItemProvider extends PageProvider
             $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
             $attributes += [
                 'data-page-new-tree-url' => (string)$uriBuilder->buildUriFromRoute('pagetree_new', ['id' => $this->record['uid']]),
-                'data-callback-module'   => 'TYPO3/CMS/WizardCrpagetree/ContextMenuActions',
+                'data-callback-module' => '@michielroos/wizardcrpagetree/context-menu-actions',
             ];
         }
         return $attributes;
