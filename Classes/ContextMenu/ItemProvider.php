@@ -14,6 +14,9 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 class ItemProvider extends PageProvider
 {
+    /**
+     * @var array<string,array<string,string>>
+     */
     protected $itemsConfiguration = [
         'pagesNewTree' => [
             'type'           => 'item',
@@ -28,8 +31,8 @@ class ItemProvider extends PageProvider
      * You could also modify existing items here.
      * The new item is added after the 'info' item.
      *
-     * @param array $items
-     * @return array
+     * @param array<string,mixed> $items
+     * @return array<string,mixed>
      */
     public function addItems(array $items): array
     {
@@ -40,7 +43,7 @@ class ItemProvider extends PageProvider
             // renders an item based on the configuration from $this->itemsConfiguration
             $localItems = $this->prepareItems($this->itemsConfiguration);
             //finds a position of the item after which this item should be added
-            $position = array_search('info', array_keys($items), true);
+            $position = (int)array_search('info', array_keys($items), true);
 
             // slices array into two parts
             $beginning = array_slice($items, 0, $position + 1, true);

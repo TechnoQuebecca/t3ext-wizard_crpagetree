@@ -22,6 +22,12 @@ use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 
+/**
+ * @phpstan-type PageData array<int,string>
+ * // data?: mixed is wrong here and should be PageTreeStructure, but is not allowed by phpstan
+ * @phpstan-type PageTreeData array{data?: mixed, value?: string}
+ * @phpstan-type PageTreeStructure array<int,PageTreeData>
+ */
 class NewPagetreeController
 {
     protected ServerRequestInterface $request;
@@ -55,9 +61,6 @@ class NewPagetreeController
         // Doc header handling
         $this->moduleTemplate->getDocHeaderComponent()->setMetaInformation($pageRecord);
         $buttonBar = $this->moduleTemplate->getDocHeaderComponent()->getButtonBar();
-        $cshButton = $buttonBar->makeHelpButton()
-            ->setModuleName('pagetree_new')
-            ->setFieldName('pagetree_new');
         $previewDataAttributes = PreviewUriBuilder::create($pageUid)
             ->withRootLine(BackendUtility::BEgetRootLine($pageUid))
             ->buildDispatcherDataAttributes();
@@ -66,7 +69,7 @@ class NewPagetreeController
             ->setTitle($this->getLanguageService()->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.showPage'))
             ->setIcon($this->iconFactory->getIcon('actions-view-page', IconSize::SMALL))
             ->setHref('#');
-        $buttonBar->addButton($cshButton)->addButton($viewButton);
+        $buttonBar->addButton($viewButton);
 
         // Main view setup
         $view = $this->moduleTemplate;
@@ -79,6 +82,7 @@ class NewPagetreeController
         $view->assign('pageUid', $pageUid);
 
         if ($canCreateNew) {
+            /** @var array{pageTree: ?string, createInListEnd: ?bool, hidePages: ?bool, hidePagesInMenus: ?bool} $parsedBody */
             $parsedBody = $request->getParsedBody();
             $newPagesData = $parsedBody['pageTree'] ?? '';
             if (!empty($newPagesData)) {
@@ -113,7 +117,7 @@ class NewPagetreeController
     /**
      * Persist new pages in DB
      *
-     * @param array $newPagesData Data array with title and page type
+     * @param PageData $newPagesData Data array with title and page type
      * @param int $pageUid Uid of page new pages should be added in
      * @param bool $afterExisting True if new pages should be created after existing pages
      * @param bool $hidePages True if new pages should be set to hidden
@@ -136,9 +140,10 @@ class NewPagetreeController
 
         $commandArray = [];
 
-        $ic = $this->getIndentationChar();
-        $sc = $this->getSeparationChar();
-        $ef = $this->getExtraFields();
+        $parsedBody = (array)$this->request->getParsedBody();
+        $ic = $this->getIndentationChar($parsedBody);
+        $sc = $this->getSeparationChar($parsedBody);
+        $ef = $this->getExtraFields($parsedBody);
 
         // Reverse the ordering of the data
         $originalData = $this->getArray($newPagesData, 0, $ic);
@@ -214,6 +219,7 @@ class NewPagetreeController
      * Fetch all data fields for full page icon display
      *
      * @param int $pageUid Get sub-pages from this pages
+     * @return list<array<string,int|string>>
      */
     protected function getSubPagesOfPage(int $pageUid): array
     {
@@ -239,9 +245,9 @@ class NewPagetreeController
     /**
      * Return the data as a compressed array
      *
-     * @param array $data the uncompressed array
+     * @param PageTreeStructure $data the uncompressed array
      *
-     * @return   array      the data as a compressed array
+     * @return   PageData      the data as a compressed array
      */
     private function compressArray(array $data): array
     {
@@ -261,11 +267,11 @@ class NewPagetreeController
     /**
      * Return the data as a nested array
      *
-     * @param array $data the data array
+     * @param PageData $data the data array
      * @param int $oldLevel the current level
      * @param string $character indentation character
      *
-     * @return   array      the data as a nested array
+     * @return  PageTreeStructure      the data as a nested array
      */
     private function getArray(array $data, int $oldLevel = 0, string $character = ' '): array
     {
@@ -320,9 +326,9 @@ class NewPagetreeController
     /**
      * Return the data with all the leaves sorted in reverse order
      *
-     * @param array $data input array
+     * @param PageTreeStructure $data input array
      *
-     * @return   array      the data reversed
+     * @return   PageTreeStructure      the data reversed
      */
     private function reverseArray(array $data): array
     {
@@ -333,7 +339,7 @@ class NewPagetreeController
                 $newData[$index]['data'] = $this->reverseArray($chunk['data']);
                 krsort($newData[$index]['data']);
             }
-            $newData[$index]['value'] = $chunk['value'];
+            $newData[$index]['value'] = $chunk['value'] ?? '';
             $index++;
         }
         krsort($newData);
@@ -344,9 +350,9 @@ class NewPagetreeController
     /**
      * Return the data without comment fields and empty lines
      *
-     * @param array $data input array
+     * @param PageData $data input array
      *
-     * @return   array      the data reversed
+     * @return   PageData      the data reversed
      */
     private function filterComments(array $data): array
     {
@@ -384,11 +390,12 @@ class NewPagetreeController
     /**
      * Get the indentation character (space, tab or dot)
      *
+     * @param array<string,mixed> $params
      * @return   string      the indentation character
      */
-    private function getIndentationChar(): string
+    private function getIndentationChar(array $params): string
     {
-        $character = $this->request->getParsedBody()['indentationCharacter'];
+        $character = $params['indentationCharacter'] ?? '';
         return match ($character) {
             'dot' => '\.',
             'tab' => '\t',
@@ -399,11 +406,12 @@ class NewPagetreeController
     /**
      * Get the separation character (, or | or ; or :)
      *
+     * @param array<string,mixed> $params
      * @return   string      the separation character
      */
-    private function getSeparationChar(): string
+    private function getSeparationChar(array $params): string
     {
-        $character = $this->request->getParsedBody()['separationCharacter'];
+        $character = $params['separationCharacter'] ?? '';
         return match ($character) {
             'pipe' => '|',
             'semicolon' => ';',
@@ -415,11 +423,12 @@ class NewPagetreeController
     /**
      * Get the extra fields
      *
-     * @return   array      the extra fields
+     * @param array<string,mixed> $params
+     * @return   string[]      the extra fields
      */
-    private function getExtraFields(): array
+    private function getExtraFields(array $params): array
     {
-        $efLine = $this->request->getParsedBody()['extraFields'];
+        $efLine = $params['extraFields'] ?? '';
         if (trim($efLine)) {
             return GeneralUtility::trimExplode(' ', $efLine, true);
         }

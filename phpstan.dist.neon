@@ -1,0 +1,9 @@
+includes:
+	- .Build/tools/phpstan/vendor/bnf/phpstan-psr-container/extension.neon
+	- .Build/tools/phpstan/vendor/phpstan/phpstan-phpunit/extension.neon
+	- .Build/tools/phpstan/vendor/phpstan/phpstan-phpunit/rules.neon
+
+parameters:
+	level: 8
+	paths:
+		- Classes
