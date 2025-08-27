@@ -21,8 +21,10 @@
 		"mass editing"
 	],
 	"require": {
-		"php": "^8.1",
-		"typo3/cms-backend": "^11.5 || ^12.4"
+		"php": "^8.2",
+		"typo3/cms-core": "^13.4",
+		"typo3/cms-backend": "^13.4",
+		"typo3/cms-fluid": "^13.4"
 	},
 	"autoload": {
 		"psr-4": {
@@ -31,10 +33,18 @@
 	},
 	"extra": {
 		"typo3/cms": {
+			"web-dir": ".Build/public",
 			"extension-key": "wizard_crpagetree"
 		},
 		"branch-alias": {
-			"dev-master": "6.x-dev"
+			"dev-master": "7.x-dev"
+		}
+	},
+	"config": {
+		"vendor-dir": ".Build/vendor",
+		"allow-plugins": {
+			"typo3/cms-composer-installers": true,
+			"typo3/class-alias-loader": true
 		}
 	}
 }

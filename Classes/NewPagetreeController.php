@@ -1,11 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace MichielRoos\WizardCrpagetree;
 
-use Doctrine\DBAL\DBALException;
-use Doctrine\DBAL\Driver\Exception;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Backend\Attribute\AsController;
 use TYPO3\CMS\Backend\Routing\PreviewUriBuilder;
 use TYPO3\CMS\Backend\Template\ModuleTemplate;
 use TYPO3\CMS\Backend\Template\ModuleTemplateFactory;
@@ -15,43 +16,34 @@ use TYPO3\CMS\Core\Database\Connection;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
-use TYPO3\CMS\Core\Http\HtmlResponse;
-use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Core\Imaging\IconSize;
 use TYPO3\CMS\Core\Localization\LanguageService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
-use TYPO3\CMS\Fluid\View\StandaloneView;
 
 /**
- * "New page tree" controller
- *
- * Fluid template based backend module for TYPO3 9.5
- *
+ * @phpstan-type PageData array<int,string>
+ * // data?: mixed is wrong here and should be PageTreeStructure, but is not allowed by phpstan
+ * @phpstan-type PageTreeData array{data?: mixed, value?: string}
+ * @phpstan-type PageTreeStructure array<int,PageTreeData>
  */
+#[AsController]
 class NewPagetreeController
 {
     protected ServerRequestInterface $request;
 
     protected ModuleTemplate $moduleTemplate;
 
-    protected IconFactory $iconFactory;
-    protected ModuleTemplateFactory $moduleTemplateFactory;
-
-    public function __construct(IconFactory $iconFactory, ModuleTemplateFactory $moduleTemplateFactory)
-    {
-        $this->iconFactory = $iconFactory;
-        $this->moduleTemplateFactory = $moduleTemplateFactory;
-    }
+    public function __construct(
+        protected IconFactory $iconFactory,
+        protected ModuleTemplateFactory $moduleTemplateFactory,
+        private readonly ConnectionPool $connectionPool
+    ) {}
 
     /**
      * Main function Handling input variables and rendering main view
-     *
-     * @param ServerRequestInterface $request
-     * @return ResponseInterface Response
-     * @throws DBALException
-     * @throws Exception
      */
     public function mainAction(ServerRequestInterface $request): ResponseInterface
     {
@@ -65,31 +57,24 @@ class NewPagetreeController
         $pageRecord = BackendUtility::readPageAccess($pageUid, $backendUser->getPagePermsClause(Permission::PAGE_SHOW));
         if (!is_array($pageRecord)) {
             // User has no permission on parent page, should not happen, just render an empty page
-            $this->moduleTemplate->setContent('');
-            return new HtmlResponse($this->moduleTemplate->renderContent());
+            return $this->moduleTemplate->renderResponse();
         }
 
         // Doc header handling
         $this->moduleTemplate->getDocHeaderComponent()->setMetaInformation($pageRecord);
         $buttonBar = $this->moduleTemplate->getDocHeaderComponent()->getButtonBar();
-        $cshButton = $buttonBar->makeHelpButton()
-            ->setModuleName('pagetree_new')
-            ->setFieldName('pagetree_new');
         $previewDataAttributes = PreviewUriBuilder::create($pageUid)
             ->withRootLine(BackendUtility::BEgetRootLine($pageUid))
             ->buildDispatcherDataAttributes();
         $viewButton = $buttonBar->makeLinkButton()
             ->setDataAttributes($previewDataAttributes ?? [])
             ->setTitle($this->getLanguageService()->sL('LLL:EXT:core/Resources/Private/Language/locallang_core.xlf:labels.showPage'))
-            ->setIcon($this->iconFactory->getIcon('actions-view-page', Icon::SIZE_SMALL))
+            ->setIcon($this->iconFactory->getIcon('actions-view-page', IconSize::SMALL))
             ->setHref('#');
-        $buttonBar->addButton($cshButton)->addButton($viewButton);
+        $buttonBar->addButton($viewButton);
 
         // Main view setup
-        $view = GeneralUtility::makeInstance(StandaloneView::class);
-        $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName(
-            'EXT:wizard_crpagetree/Resources/Private/Templates/Page/NewPagetree.html'
-        ));
+        $view = $this->moduleTemplate;
 
         $calculatedPermissions = new Permission($backendUser->calcPerms($pageRecord));
         $canCreateNew = $backendUser->isAdmin() || $calculatedPermissions->createPagePermissionIsGranted();
@@ -99,6 +84,7 @@ class NewPagetreeController
         $view->assign('pageUid', $pageUid);
 
         if ($canCreateNew) {
+            /** @var array{pageTree: ?string, createInListEnd: ?bool, hidePages: ?bool, hidePagesInMenus: ?bool} $parsedBody */
             $parsedBody = $request->getParsedBody();
             $newPagesData = $parsedBody['pageTree'] ?? '';
             if (!empty($newPagesData)) {
@@ -127,14 +113,13 @@ class NewPagetreeController
             $view->assign('hasNewPagesData', $hasNewPagesData);
         }
 
-        $this->moduleTemplate->setContent($view->render());
-        return new HtmlResponse($this->moduleTemplate->renderContent());
+        return $this->moduleTemplate->renderResponse('Page/NewPagetree');
     }
 
     /**
      * Persist new pages in DB
      *
-     * @param array $newPagesData Data array with title and page type
+     * @param PageData $newPagesData Data array with title and page type
      * @param int $pageUid Uid of page new pages should be added in
      * @param bool $afterExisting True if new pages should be created after existing pages
      * @param bool $hidePages True if new pages should be set to hidden
@@ -148,11 +133,7 @@ class NewPagetreeController
         // Set first pid to "-1 * uid of last existing sub-page" if pages should be created at end
         $firstPid = $pageUid;
         if ($afterExisting) {
-            try {
-                $subPages = $this->getSubPagesOfPage($pageUid);
-            } catch (DBALException|Exception) {
-                return false;
-            }
+            $subPages = $this->getSubPagesOfPage($pageUid);
             $lastPage = end($subPages);
             if (isset($lastPage['uid']) && MathUtility::canBeInterpretedAsInteger($lastPage['uid'])) {
                 $firstPid = -(int)$lastPage['uid'];
@@ -161,9 +142,10 @@ class NewPagetreeController
 
         $commandArray = [];
 
-        $ic = $this->getIndentationChar();
-        $sc = $this->getSeparationChar();
-        $ef = $this->getExtraFields();
+        $parsedBody = (array)$this->request->getParsedBody();
+        $ic = $this->getIndentationChar($parsedBody);
+        $sc = $this->getSeparationChar($parsedBody);
+        $ef = $this->getExtraFields($parsedBody);
 
         // Reverse the ordering of the data
         $originalData = $this->getArray($newPagesData, 0, $ic);
@@ -239,13 +221,11 @@ class NewPagetreeController
      * Fetch all data fields for full page icon display
      *
      * @param int $pageUid Get sub-pages from this pages
-     * @return array
-     * @throws Exception
-     * @throws DBALException
+     * @return list<array<string,int|string>>
      */
     protected function getSubPagesOfPage(int $pageUid): array
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('pages');
         $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
         return $queryBuilder->select('*')
             ->from('pages')
@@ -264,13 +244,12 @@ class NewPagetreeController
             ->fetchAllAssociative();
     }
 
-
     /**
      * Return the data as a compressed array
      *
-     * @param array $data the uncompressed array
+     * @param PageTreeStructure $data the uncompressed array
      *
-     * @return   array      the data as a compressed array
+     * @return   PageData      the data as a compressed array
      */
     private function compressArray(array $data): array
     {
@@ -290,11 +269,11 @@ class NewPagetreeController
     /**
      * Return the data as a nested array
      *
-     * @param array $data the data array
+     * @param PageData $data the data array
      * @param int $oldLevel the current level
      * @param string $character indentation character
      *
-     * @return   array      the data as a nested array
+     * @return  PageTreeStructure      the data as a nested array
      */
     private function getArray(array $data, int $oldLevel = 0, string $character = ' '): array
     {
@@ -349,9 +328,9 @@ class NewPagetreeController
     /**
      * Return the data with all the leaves sorted in reverse order
      *
-     * @param array $data input array
+     * @param PageTreeStructure $data input array
      *
-     * @return   array      the data reversed
+     * @return   PageTreeStructure      the data reversed
      */
     private function reverseArray(array $data): array
     {
@@ -362,7 +341,7 @@ class NewPagetreeController
                 $newData[$index]['data'] = $this->reverseArray($chunk['data']);
                 krsort($newData[$index]['data']);
             }
-            $newData[$index]['value'] = $chunk['value'];
+            $newData[$index]['value'] = $chunk['value'] ?? '';
             $index++;
         }
         krsort($newData);
@@ -373,9 +352,9 @@ class NewPagetreeController
     /**
      * Return the data without comment fields and empty lines
      *
-     * @param array $data input array
+     * @param PageData $data input array
      *
-     * @return   array      the data reversed
+     * @return   PageData      the data reversed
      */
     private function filterComments(array $data): array
     {
@@ -413,11 +392,12 @@ class NewPagetreeController
     /**
      * Get the indentation character (space, tab or dot)
      *
+     * @param array<string,mixed> $params
      * @return   string      the indentation character
      */
-    private function getIndentationChar(): string
+    private function getIndentationChar(array $params): string
     {
-        $character = $this->request->getParsedBody()['indentationCharacter'];
+        $character = $params['indentationCharacter'] ?? '';
         return match ($character) {
             'dot' => '\.',
             'tab' => '\t',
@@ -428,11 +408,12 @@ class NewPagetreeController
     /**
      * Get the separation character (, or | or ; or :)
      *
+     * @param array<string,mixed> $params
      * @return   string      the separation character
      */
-    private function getSeparationChar(): string
+    private function getSeparationChar(array $params): string
     {
-        $character = $this->request->getParsedBody()['separationCharacter'];
+        $character = $params['separationCharacter'] ?? '';
         return match ($character) {
             'pipe' => '|',
             'semicolon' => ';',
@@ -444,11 +425,12 @@ class NewPagetreeController
     /**
      * Get the extra fields
      *
-     * @return   array      the extra fields
+     * @param array<string,mixed> $params
+     * @return   string[]      the extra fields
      */
-    private function getExtraFields(): array
+    private function getExtraFields(array $params): array
     {
-        $efLine = $this->request->getParsedBody()['extraFields'];
+        $efLine = $params['extraFields'] ?? '';
         if (trim($efLine)) {
             return GeneralUtility::trimExplode(' ', $efLine, true);
         }
@@ -456,21 +438,11 @@ class NewPagetreeController
         return [];
     }
 
-    /**
-     * Returns LanguageService
-     *
-     * @return LanguageService
-     */
     protected function getLanguageService(): LanguageService
     {
         return $GLOBALS['LANG'];
     }
 
-    /**
-     * Returns current BE user
-     *
-     * @return BackendUserAuthentication
-     */
     protected function getBackendUser(): BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'];

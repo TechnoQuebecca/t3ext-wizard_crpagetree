@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace MichielRoos\WizardCrpagetree\ContextMenu;
 
 use TYPO3\CMS\Backend\ContextMenu\ItemProviders\PageProvider;
@@ -7,19 +9,17 @@ use TYPO3\CMS\Backend\Routing\Exception\RouteNotFoundException;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
-/**
- * Class ItemProvider
- * @package MichielRoos\WizardCrpagetree\ContextMenu
- */
 class ItemProvider extends PageProvider
 {
+    /**
+     * @var array<string,array<string,string>>
+     */
     protected $itemsConfiguration = [
         'pagesNewTree' => [
-            'type'           => 'item',
             'label'          => 'LLL:EXT:wizard_crpagetree/Resources/Private/Language/locallang.xlf:title',
             'iconIdentifier' => 'apps-pagetree-drag-move-between',
-            'callbackAction' => 'pagesNewTree'
-        ]
+            'callbackAction' => 'pagesNewTree',
+        ],
     ];
 
     /**
@@ -27,8 +27,8 @@ class ItemProvider extends PageProvider
      * You could also modify existing items here.
      * The new item is added after the 'info' item.
      *
-     * @param array $items
-     * @return array
+     * @param array<string,mixed> $items
+     * @return array<string,mixed>
      */
     public function addItems(array $items): array
     {
@@ -39,7 +39,7 @@ class ItemProvider extends PageProvider
             // renders an item based on the configuration from $this->itemsConfiguration
             $localItems = $this->prepareItems($this->itemsConfiguration);
             //finds a position of the item after which this item should be added
-            $position = array_search('info', array_keys($items), true);
+            $position = (int)array_search('info', array_keys($items), true);
 
             // slices array into two parts
             $beginning = array_slice($items, 0, $position + 1, true);
@@ -61,7 +61,6 @@ class ItemProvider extends PageProvider
      * BEWARE: Returned priority should logically not clash with another provider.
      *         Please check @return int
      * @see \TYPO3\CMS\Backend\ContextMenu\ContextMenu::getAvailableProviders() if needed.
-     *
      */
     public function getPriority(): int
     {
@@ -81,7 +80,7 @@ class ItemProvider extends PageProvider
             $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
             $attributes += [
                 'data-page-new-tree-url' => (string)$uriBuilder->buildUriFromRoute('pagetree_new', ['id' => $this->record['uid']]),
-                'data-callback-module'   => 'TYPO3/CMS/WizardCrpagetree/ContextMenuActions',
+                'data-callback-module' => '@michielroos/wizardcrpagetree/context-menu-actions',
             ];
         }
         return $attributes;
